@@ -5,7 +5,8 @@ use crate::Node;
 use crate::net::ResourceHandler;
 use crate::node::NodeFlags;
 use crate::{
-    BaseDocument, net::ImageHandler, node::ImageResourceData, node::Status, util::ImageLayerKind,
+    BaseDocument, net::ImageHandler, node::ImageResourceData, node::Status, stylo_to_parley,
+    util::ImageLayerKind,
 };
 use style::properties::ComputedValues;
 use style::properties::generated::longhands::position::computed_value::T as Position;
@@ -393,6 +394,16 @@ impl BaseDocument {
                 continue;
             }
 
+            let input_style = node
+                .element_data()
+                .is_some_and(|element| element.text_input_data().is_some())
+                .then(|| {
+                    node.primary_styles()
+                        .as_ref()
+                        .map(|styles| stylo_to_parley::style(node.id, styles))
+                })
+                .flatten();
+
             let Some(element) = node.data.downcast_element_mut() else {
                 continue;
             };
@@ -404,7 +415,8 @@ impl BaseDocument {
                     node.insert_damage(ALL_DAMAGE);
                 }
             } else if let Some(input) = element.text_input_data_mut() {
-                input.editor.set_scale(scale);
+                let style = input_style.unwrap_or_default();
+                super::construct::style_text_editor(&mut input.editor, &style, scale);
                 let mut font_ctx = font_ctx.lock().unwrap();
                 input.editor.refresh_layout(&mut font_ctx, layout_ctx);
                 node.insert_damage(ONLY_RELAYOUT);

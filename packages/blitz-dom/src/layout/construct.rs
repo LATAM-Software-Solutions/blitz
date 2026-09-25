@@ -877,16 +877,35 @@ fn create_text_editor(doc: &mut BaseDocument, input_element_id: NodeId, is_multi
     };
 
     let editor = &mut text_input_data.editor;
-    editor.set_scale(doc.viewport.scale_f64() as f32);
     editor.set_width(None);
-
-    let styles = editor.edit_styles();
-    styles.retain(|_| false);
-    styles.insert(StyleProperty::FontSize(parley_style.font_size));
-    styles.insert(StyleProperty::LineHeight(parley_style.line_height));
-    styles.insert(StyleProperty::Brush(parley_style.brush));
+    style_text_editor(editor, &parley_style, doc.viewport.scale_f64() as f32);
 
     editor.refresh_layout(&mut doc.font_ctx.lock().unwrap(), &mut doc.layout_ctx);
+}
+
+/// Sets the scale a text editor lays out at and the styles it lays its text out in. The editor
+/// breaks its own lines against parley's default `f32::MAX` height limit, which a line of
+/// infinite height - huge author lengths times the scale - exceeds forever, so what it is given
+/// is kept finite at `scale`.
+pub(crate) fn style_text_editor(
+    editor: &mut parley::PlainEditor<TextBrush>,
+    style: &parley::TextStyle<'static, 'static, TextBrush>,
+    scale: f32,
+) {
+    let most = f32::MAX / scale.max(1.0);
+    let font_size = style.font_size.min(most);
+    let line_height = if (resolve_line_height(style.line_height, font_size) * scale).is_finite() {
+        style.line_height
+    } else {
+        parley::LineHeight::Absolute(most)
+    };
+
+    editor.set_scale(scale);
+    let styles = editor.edit_styles();
+    styles.retain(|_| false);
+    styles.insert(StyleProperty::FontSize(font_size));
+    styles.insert(StyleProperty::LineHeight(line_height));
+    styles.insert(StyleProperty::Brush(style.brush));
 }
 
 fn create_checkbox_input(doc: &mut BaseDocument, input_element_id: NodeId) {
