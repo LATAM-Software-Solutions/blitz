@@ -1005,14 +1005,16 @@ pub(crate) fn finite_editor_sizes(
     line_height: parley::LineHeight,
     scale: f32,
 ) -> (f32, parley::LineHeight) {
-    let most = f32::MAX / scale.max(1.0);
+    // Half the range, so that parley multiplying by `scale` again cannot round up to infinity.
+    let most = f32::MAX / 2.0 / scale.max(1.0);
     let font_size = font_size.min(most);
+    // In parley's own order: the scaled font size first, then the line height from it.
     let tallest = match line_height {
         parley::LineHeight::MetricsRelative(relative)
-        | parley::LineHeight::FontSizeRelative(relative) => relative * font_size,
-        parley::LineHeight::Absolute(absolute) => absolute,
+        | parley::LineHeight::FontSizeRelative(relative) => relative * (font_size * scale),
+        parley::LineHeight::Absolute(absolute) => absolute * scale,
     };
-    if (tallest * scale).is_finite() {
+    if tallest.is_finite() {
         (font_size, line_height)
     } else {
         (font_size, parley::LineHeight::Absolute(most))
