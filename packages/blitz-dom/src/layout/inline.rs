@@ -867,7 +867,6 @@ impl BaseDocument {
     }
 }
 
-#[inline(always)]
 /// Breaks every line at `width` with no limit on line height. Parley's default limit is
 /// `f32::MAX`, and a line taller than that - huge author lengths can sum to infinity - makes it
 /// yield `MaxHeightExceeded` for the same line forever without advancing.
@@ -877,6 +876,7 @@ pub(crate) fn break_all_lines(layout: &mut parley::Layout<TextBrush>, width: f32
     breaker.break_remaining(width);
 }
 
+#[inline(always)]
 fn f32_max(a: f32, b: f32) -> f32 {
     a.max(b)
 }

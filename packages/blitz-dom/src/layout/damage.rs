@@ -6,8 +6,10 @@ use crate::net::ResourceHandler;
 use crate::node::NodeFlags;
 use crate::tree::NodeTree;
 use crate::{
-    BaseDocument, net::ImageHandler, node::ImageResourceData, node::Status, util::ImageLayerKind,
+    BaseDocument, net::ImageHandler, node::ImageResourceData, node::Status, stylo_to_parley,
+    util::ImageLayerKind,
 };
+use parley::StyleProperty;
 use style::properties::ComputedValues;
 use style::properties::generated::longhands::position::computed_value::T as Position;
 use style::selector_parser::RestyleDamage;
@@ -480,6 +482,16 @@ impl BaseDocument {
                 continue;
             }
 
+            let input_style = node
+                .element_data()
+                .is_some_and(|element| element.text_input_data().is_some())
+                .then(|| {
+                    node.primary_styles()
+                        .as_ref()
+                        .map(|styles| stylo_to_parley::style(node.id, styles))
+                })
+                .flatten();
+
             let Some(element) = node.data.downcast_element_mut() else {
                 continue;
             };
@@ -492,6 +504,16 @@ impl BaseDocument {
                 }
             } else if let Some(input) = element.text_input_data_mut() {
                 input.editor.set_scale(scale);
+                if let Some(style) = &input_style {
+                    let (font_size, line_height) = super::construct::finite_editor_sizes(
+                        style.font_size,
+                        style.line_height,
+                        scale,
+                    );
+                    let styles = input.editor.edit_styles();
+                    styles.insert(StyleProperty::FontSize(font_size));
+                    styles.insert(StyleProperty::LineHeight(line_height));
+                }
                 let mut font_ctx = font_ctx.lock().unwrap();
                 input.editor.refresh_layout(&mut font_ctx, layout_ctx);
                 node.insert_damage(ONLY_RELAYOUT);

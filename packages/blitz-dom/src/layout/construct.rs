@@ -967,19 +967,22 @@ fn create_text_editor(doc: &mut BaseDocument, input_element_id: NodeId, is_multi
     };
 
     let editor = &mut text_input_data.editor;
-    editor.set_scale(doc.viewport.scale_f64() as f32);
+    let scale = doc.viewport.scale_f64() as f32;
+    editor.set_scale(scale);
     editor.set_width(None);
+    let (font_size, line_height) =
+        finite_editor_sizes(parley_style.font_size, parley_style.line_height, scale);
 
     let styles = editor.edit_styles();
     styles.retain(|_| false);
     styles.insert(StyleProperty::FontFamily(parley_style.font_family));
-    styles.insert(StyleProperty::FontSize(parley_style.font_size));
+    styles.insert(StyleProperty::FontSize(font_size));
     styles.insert(StyleProperty::FontWidth(parley_style.font_width));
     styles.insert(StyleProperty::FontStyle(parley_style.font_style));
     styles.insert(StyleProperty::FontWeight(parley_style.font_weight));
     styles.insert(StyleProperty::FontVariations(parley_style.font_variations));
     styles.insert(StyleProperty::FontFeatures(parley_style.font_features));
-    styles.insert(StyleProperty::LineHeight(parley_style.line_height));
+    styles.insert(StyleProperty::LineHeight(line_height));
     styles.insert(StyleProperty::WordSpacing(parley_style.word_spacing));
     styles.insert(StyleProperty::LetterSpacing(parley_style.letter_spacing));
     styles.insert(StyleProperty::WordBreak(parley_style.word_break));
@@ -992,6 +995,28 @@ fn create_text_editor(doc: &mut BaseDocument, input_element_id: NodeId, is_multi
     editor.set_alignment(alignment);
 
     editor.refresh_layout(&mut doc.font_ctx.lock().unwrap(), &mut doc.layout_ctx);
+}
+
+/// The font size and line height a text editor is given, kept finite at `scale`. The editor
+/// breaks its own lines against parley's default `f32::MAX` height limit, which a line of
+/// infinite height - huge author lengths times the scale - exceeds forever.
+pub(crate) fn finite_editor_sizes(
+    font_size: f32,
+    line_height: parley::LineHeight,
+    scale: f32,
+) -> (f32, parley::LineHeight) {
+    let most = f32::MAX / scale.max(1.0);
+    let font_size = font_size.min(most);
+    let tallest = match line_height {
+        parley::LineHeight::MetricsRelative(relative)
+        | parley::LineHeight::FontSizeRelative(relative) => relative * font_size,
+        parley::LineHeight::Absolute(absolute) => absolute,
+    };
+    if (tallest * scale).is_finite() {
+        (font_size, line_height)
+    } else {
+        (font_size, parley::LineHeight::Absolute(most))
+    }
 }
 
 fn create_checkbox_input(doc: &mut BaseDocument, input_element_id: NodeId) {
