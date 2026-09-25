@@ -16,6 +16,7 @@ use taffy::{Clear, Float, prelude::TaffyMaxContent};
 
 use super::resolve_calc_value;
 use crate::BaseDocument;
+use crate::node::TextBrush;
 
 impl BaseDocument {
     pub(crate) fn compute_inline_layout(
@@ -486,7 +487,7 @@ impl BaseDocument {
 
         #[cfg(not(feature = "floats"))]
         {
-            inline_layout.layout.break_all_lines(Some(width));
+            break_all_lines(&mut inline_layout.layout, width);
         }
 
         // Perform inline layout
@@ -498,6 +499,9 @@ impl BaseDocument {
             let state = breaker.state_mut();
             state.set_layout_max_advance(width);
             state.set_line_max_advance(initial_slot.width * scale);
+            // See `break_all_lines`: an unbounded limit is what keeps a line of
+            // infinite height from yielding `MaxHeightExceeded` forever.
+            state.set_line_max_height(f32::INFINITY);
             state.set_line_x(initial_slot.x * scale);
             state.set_line_y((initial_slot.y * scale) as f64);
 
@@ -854,6 +858,15 @@ impl BaseDocument {
 }
 
 #[inline(always)]
+/// Breaks every line at `width` with no limit on line height. Parley's default limit is
+/// `f32::MAX`, and a line taller than that - huge author lengths can sum to infinity - makes it
+/// yield `MaxHeightExceeded` for the same line forever without advancing.
+pub(crate) fn break_all_lines(layout: &mut parley::Layout<TextBrush>, width: f32) {
+    let mut breaker = layout.break_lines();
+    breaker.state_mut().set_line_max_height(f32::INFINITY);
+    breaker.break_remaining(width);
+}
+
 fn f32_max(a: f32, b: f32) -> f32 {
     a.max(b)
 }

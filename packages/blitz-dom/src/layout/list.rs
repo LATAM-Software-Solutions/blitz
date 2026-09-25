@@ -103,7 +103,7 @@ fn node_list_item_child(
 
             let mut layout = builder.build().0;
             let width = layout.calculate_content_widths().max;
-            layout.break_all_lines(Some(width));
+            super::inline::break_all_lines(&mut layout, width);
 
             ListItemLayoutPosition::Outside(Box::new(layout))
         }
