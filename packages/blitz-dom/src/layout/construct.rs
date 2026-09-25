@@ -892,9 +892,16 @@ pub(crate) fn style_text_editor(
     style: &parley::TextStyle<'static, 'static, TextBrush>,
     scale: f32,
 ) {
-    let most = f32::MAX / scale.max(1.0);
+    // Half the range, so that parley multiplying by `scale` again cannot round up to infinity.
+    let most = f32::MAX / 2.0 / scale.max(1.0);
     let font_size = style.font_size.min(most);
-    let line_height = if (resolve_line_height(style.line_height, font_size) * scale).is_finite() {
+    // In parley's own order: the scaled font size first, then the line height from it.
+    let tallest = match style.line_height {
+        parley::LineHeight::FontSizeRelative(relative)
+        | parley::LineHeight::MetricsRelative(relative) => relative * (font_size * scale),
+        parley::LineHeight::Absolute(absolute) => absolute * scale,
+    };
+    let line_height = if tallest.is_finite() {
         style.line_height
     } else {
         parley::LineHeight::Absolute(most)

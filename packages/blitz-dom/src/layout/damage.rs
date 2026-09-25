@@ -415,8 +415,12 @@ impl BaseDocument {
                     node.insert_damage(ALL_DAMAGE);
                 }
             } else if let Some(input) = element.text_input_data_mut() {
-                let style = input_style.unwrap_or_default();
-                super::construct::style_text_editor(&mut input.editor, &style, scale);
+                match &input_style {
+                    Some(style) => {
+                        super::construct::style_text_editor(&mut input.editor, style, scale)
+                    }
+                    None => input.editor.set_scale(scale),
+                }
                 let mut font_ctx = font_ctx.lock().unwrap();
                 input.editor.refresh_layout(&mut font_ctx, layout_ctx);
                 node.insert_damage(ONLY_RELAYOUT);
